@@ -42,7 +42,7 @@
 #define PROXIMITY_SENSOR2_PIN 5
 #define START_SIGNAL_PIN 6
 #define PAUSE_SIGNAL_PIN 7
-#define SPEEED_ADC_PIN 8
+#define SPEED_ADC_PIN 8
 #define BRAKE_PIN 9
 
 
@@ -156,7 +156,8 @@ void Receive()
 
 void accelerate(int targetSpeed, int direction){
 
-    isMoving = true;
+  digitalWrite(BRAKE_PIN, 0);
+  isMoving = true;
 #ifdef GRADUAL_ACC
   int i;
   for(int i = ACC_STEP; i < targetSpeed; i+=ACC_STEP){
@@ -170,6 +171,7 @@ void accelerate(int targetSpeed, int direction){
 }
 
 void stop(){
+  digitalWrite(BRAKE_PIN, 1);
   Send(0,0);
   isMoving = false;
 }
@@ -182,7 +184,6 @@ void setup()
 
   HoverSerial.begin(HOVER_SERIAL_BAUD);
 
-
   //init pins
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(BRAKE_PIN, OUTPUT);
@@ -191,7 +192,7 @@ void setup()
   pinMode(PROXIMITY_SENSOR2_PIN, INPUT_PULLUP);
   pinMode(START_SIGNAL_PIN, INPUT_PULLUP);
   pinMode(PAUSE_SIGNAL_PIN, INPUT_PULLUP);
-  pinMode(SPEEED_ADC_PIN, INPUT_ANALOG);
+  pinMode(SPEED_ADC_PIN, INPUT_ANALOG);
 
 }
 
@@ -209,7 +210,7 @@ void loop(void)
 
   // Check for start signal
   if(!digitalRead(START_SIGNAL_PIN) && !isMoving){
-    speed = (analogRead(SPEEED_ADC_PIN)*SPEED_MAX_INPUT+1)/1024;
+    speed = (analogRead(SPEED_ADC_PIN)*SPEED_MAX_INPUT+1)/1024;
     if(!digitalRead(PROXIMITY_SENSOR1_PIN)){
       direction = 1;
     }
