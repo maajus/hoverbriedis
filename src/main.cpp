@@ -22,17 +22,20 @@
 #include <SoftwareSerial.h>
 
 // ########################## DEFINES ##########################
+//#define GRADUAL_ACC
 #define HOVER_SERIAL_BAUD   115200      // [-] Baud rate for HoverSerial (used to communicate with the hoverboard)
 #define SERIAL_BAUD         115200      // [-] Baud rate for built-in Serial (used for the Serial Monitor)
 #define START_FRAME         0xABCD     	// [-] Start frme definition for reliable serial communication
 #define LOOP_PERIOD         100         // [ms] Sending time interval
 #define RX_PERIOD           500         // [ms] Sending time interval
 #define SPEED_MAX_TEST      300         // [-] Maximum speed for testing
-#define SPEED_STEP          20          // [-] Speed step
-// #define DEBUG_RX                        // [-] Debug received data. Prints all bytes to serial (comment-out to disable)
-
+#define ACC_STEP            50          // [-] Acc step
+#define ACC_STEP_DELAY      100         // [-] Acc step delay
+// #define DEBUG_RX                       // [-] Debug received data. Prints all bytes to serial (comment-out to disable)
 #define SPEED_MAX_INPUT 1000
 #define SPEED_MIN_INPUT -1000
+
+//Pins
 #define SERIAL_RX_PIN 2
 #define SERIAL_TX_PIN 3
 #define PROXIMITY_SENSOR1_PIN 4
@@ -151,7 +154,25 @@ void Receive()
     incomingBytePrev = incomingByte;
 }
 
+void accelerate(int targetSpeed, int direction){
 
+    isMoving = true;
+#ifdef GRADUAL_ACC
+  int i;
+  for(int i = ACC_STEP; i < targetSpeed; i+=ACC_STEP){
+    Send(0,i*direction);
+    delay(ACC_STEP_DELAY);
+  }
+#else
+  Send(0,targetSpeed*direction);
+#endif
+
+}
+
+void stop(){
+  Send(0,0);
+  isMoving = false;
+}
 
 // ########################## SETUP ##########################
 void setup()
@@ -195,24 +216,22 @@ void loop(void)
     if(!digitalRead(PROXIMITY_SENSOR2_PIN)){
       direction = -1;
     }
-    Send(0, speed*direction);
-    isMoving = true;
+    accelerate(speed, direction);
   }
 
   //Stop if pause signal is detected
   if(!digitalRead(PAUSE_SIGNAL_PIN) && isMoving){
-    Send(0,0);
-    isMoving = false;
+    stop();
   }
 
+  //Stop if poximity1 signal is detected
   if(!digitalRead(PROXIMITY_SENSOR1_PIN) && isMoving){
-    Send(0,0);
-    isMoving = false;
+    stop();
   }
 
+  //Stop if poximity2 signal is detected
   if(!digitalRead(PROXIMITY_SENSOR2_PIN) && isMoving){
-    Send(0,0);
-    isMoving = false;
+    stop();
   }
 
   // Blink the LED
