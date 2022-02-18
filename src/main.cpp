@@ -19,14 +19,14 @@
 // *******************************************************************
 
 #include <Arduino.h>
-#include <SoftwareSerial.h>
+//#include <SoftwareSerial.h>
 
 // ########################## DEFINES ##########################
 //#define GRADUAL_ACC
 #define HOVER_SERIAL_BAUD   115200      // [-] Baud rate for HoverSerial (used to communicate with the hoverboard)
 #define SERIAL_BAUD         115200      // [-] Baud rate for built-in Serial (used for the Serial Monitor)
 #define START_FRAME         0xABCD     	// [-] Start frme definition for reliable serial communication
-#define LOOP_PERIOD         100         // [ms] Sending time interval
+#define LOOP_PERIOD         200         // [ms] Sending time interval
 #define RX_PERIOD           500         // [ms] Sending time interval
 #define SPEED_MAX_TEST      300         // [-] Maximum speed for testing
 #define ACC_STEP            50          // [-] Acc step
@@ -36,15 +36,14 @@
 #define SPEED_MIN_INPUT -1000
 
 //Pins
-#define SERIAL_RX_PIN 2
-#define SERIAL_TX_PIN 3
+#define SERIAL_RX_PIN 10
+#define SERIAL_TX_PIN 11
 #define PROXIMITY_SENSOR1_PIN 4
 #define PROXIMITY_SENSOR2_PIN 5
 #define START_SIGNAL_PIN 6
 #define PAUSE_SIGNAL_PIN 7
-#define SPEED_ADC_PIN 8
+#define SPEED_ADC_PIN A0
 #define BRAKE_PIN 9
-
 
 
 typedef struct{
@@ -66,8 +65,7 @@ typedef struct{
    uint16_t checksum;
 } SerialFeedback;
 
-
-SoftwareSerial HoverSerial(SERIAL_RX_PIN,SERIAL_TX_PIN);        // RX, TX
+//SoftwareSerial HoverSerial(SERIAL_RX_PIN,SERIAL_TX_PIN);        // RX, TX
 
 // Global variables
 uint8_t idx = 0;                        // Index for new data pointer
@@ -93,15 +91,15 @@ void Send(int16_t uSteer, int16_t uSpeed)
   Command.checksum = (uint16_t)(Command.start ^ Command.steer ^ Command.speed);
 
   // Write to Serial
-  HoverSerial.write((uint8_t *) &Command, sizeof(Command));
+  Serial.write((uint8_t *) &Command, sizeof(Command));
 }
 
 // ########################## RECEIVE ##########################
 void Receive()
 {
     // Check for new data availability in the Serial buffer
-    if (HoverSerial.available()) {
-        incomingByte 	  = HoverSerial.read();                                   // Read the incoming byte
+    if (Serial.available()) {
+        incomingByte 	  = Serial.read();                                   // Read the incoming byte
         bufStartFrame	= ((uint16_t)(incomingByte) << 8) | incomingBytePrev;       // Construct the start frame
     }
     else {
@@ -110,7 +108,7 @@ void Receive()
 
   // If DEBUG_RX is defined print all incoming bytes
 #ifdef DEBUG_RX
-        Serial.print(incomingByte);
+        //Serial.print(incomingByte);
         return;
 #endif
 
@@ -137,15 +135,15 @@ void Receive()
             memcpy(&Feedback, &NewFeedback, sizeof(SerialFeedback));
 
             // Print data to built-in Serial
-            Serial.print("1: ");   Serial.print(Feedback.cmd1);
-            Serial.print(" 2: ");  Serial.print(Feedback.cmd2);
-            Serial.print(" 3: ");  Serial.print(Feedback.speedR_meas);
-            Serial.print(" 4: ");  Serial.print(Feedback.speedL_meas);
-            Serial.print(" 5: ");  Serial.print(Feedback.batVoltage);
-            Serial.print(" 6: ");  Serial.print(Feedback.boardTemp);
-            Serial.print(" 7: ");  Serial.println(Feedback.cmdLed);
+            //Serial.print("1: ");   Serial.print(Feedback.cmd1);
+            //Serial.print(" 2: ");  Serial.print(Feedback.cmd2);
+            //Serial.print(" 3: ");  Serial.print(Feedback.speedR_meas);
+            //Serial.print(" 4: ");  Serial.print(Feedback.speedL_meas);
+            //Serial.print(" 5: ");  Serial.print(Feedback.batVoltage);
+            //Serial.print(" 6: ");  Serial.print(Feedback.boardTemp);
+            //Serial.print(" 7: ");  Serial.println(Feedback.cmdLed);
         } else {
-          Serial.println("Non-valid data skipped");
+          //Serial.println("Non-valid data skipped");
         }
         idx = 0;    // Reset the index (it prevents to enter in this if condition in the next cycle)
     }
@@ -156,7 +154,7 @@ void Receive()
 
 void accelerate(int targetSpeed, int direction){
 
-  digitalWrite(BRAKE_PIN, 0);
+  digitalWrite(BRAKE_PIN, 1);
   isMoving = true;
 #ifdef GRADUAL_ACC
   int i;
@@ -171,8 +169,9 @@ void accelerate(int targetSpeed, int direction){
 }
 
 void stop(){
-  digitalWrite(BRAKE_PIN, 1);
-  Send(0,0);
+  digitalWrite(BRAKE_PIN, 0);
+  //Send(0,0);
+  speed = 0;
   isMoving = false;
 }
 
@@ -180,9 +179,9 @@ void stop(){
 void setup()
 {
   Serial.begin(SERIAL_BAUD);
-  Serial.println("Hoverboard Serial v1.0");
+  //Serial.println("Hoverboard Serial v1.0");
 
-  HoverSerial.begin(HOVER_SERIAL_BAUD);
+  //HoverSerial.begin(HOVER_SERIAL_BAUD);
 
   //init pins
   pinMode(LED_BUILTIN, OUTPUT);
@@ -192,7 +191,12 @@ void setup()
   pinMode(PROXIMITY_SENSOR2_PIN, INPUT_PULLUP);
   pinMode(START_SIGNAL_PIN, INPUT_PULLUP);
   pinMode(PAUSE_SIGNAL_PIN, INPUT_PULLUP);
-  pinMode(SPEED_ADC_PIN, INPUT_ANALOG);
+  pinMode(SPEED_ADC_PIN, INPUT);
+
+
+  digitalWrite(BRAKE_PIN, 1);
+
+  speed = 0;
 
 }
 
@@ -203,20 +207,22 @@ void loop(void)
   unsigned long timeNow = millis();
 
   // Check for new received data
-  if(timeNow - prevTime >= RX_PERIOD){
+  //if(timeNow - prevTime >= RX_PERIOD){
     Receive();
-    prevTime = timeNow;
-  }
+    //prevTime = timeNow;
+
 
   // Check for start signal
   if(!digitalRead(START_SIGNAL_PIN) && !isMoving){
-    speed = (analogRead(SPEED_ADC_PIN)*SPEED_MAX_INPUT+1)/1024;
+    speed = analogRead(SPEED_ADC_PIN);//*SPEED_MAX_INPUT+1)/1024;
     if(!digitalRead(PROXIMITY_SENSOR1_PIN)){
       direction = 1;
     }
     if(!digitalRead(PROXIMITY_SENSOR2_PIN)){
       direction = -1;
     }
+
+    //speed = 500;
     accelerate(speed, direction);
   }
 
@@ -226,17 +232,21 @@ void loop(void)
   }
 
   //Stop if poximity1 signal is detected
-  if(!digitalRead(PROXIMITY_SENSOR1_PIN) && isMoving){
+  if(!digitalRead(PROXIMITY_SENSOR1_PIN) && isMoving && direction < 0){
     stop();
   }
 
   //Stop if poximity2 signal is detected
-  if(!digitalRead(PROXIMITY_SENSOR2_PIN) && isMoving){
+  if(!digitalRead(PROXIMITY_SENSOR2_PIN) && isMoving && direction > 0){
     stop();
   }
 
+  Send(0,speed*direction);
+  isMoving = speed > 0;
+
+
   // Blink the LED
-  digitalWrite(LED_BUILTIN, (timeNow%2000)<1000);
+  digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
   delay(LOOP_PERIOD);
 }
 
